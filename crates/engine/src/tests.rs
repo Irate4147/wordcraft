@@ -3125,3 +3125,26 @@ fn proofing_languages_survive_a_docx_round_trip() {
         issues.as_array().unwrap().iter().map(|i| (i["text"].as_str().unwrap().to_string(), i["lang"].as_str().unwrap().to_string())).collect();
     assert_eq!(found, [("żeka".to_string(), "pl".to_string()), ("wrold".to_string(), "en".to_string())], "{issues}");
 }
+
+/// Danish proofing through the review commands: Danish words, Danish suggestions and the two
+/// Danish grammar rules once the text is Danish.
+#[test]
+fn danish_proofing_through_the_review_commands() {
+    let mut s = s();
+    run(&mut s, "document.setText", json!({"text": "Huus og sommerferie paa tog station, at bliver glad."}));
+    // English by default: the Danish words are English misspellings.
+    assert!(run(&mut s, "review.issues", json!({})).as_array().unwrap().len() >= 3);
+    run(&mut s, "select.all", json!({}));
+    run(&mut s, "review.language", json!({"lang": "da-DK"}));
+    let issues = run(&mut s, "review.issues", json!({}));
+    let arr = issues.as_array().unwrap();
+    let has = |text: &str, kind: &str, sugg: &str| {
+        arr.iter()
+            .any(|i| i["text"] == text && i["kind"] == kind && i["lang"] == "da" && i["suggestions"].as_array().unwrap().iter().any(|x| x == sugg))
+    };
+    assert!(has("Huus", "spelling", "Hus"), "{issues}");
+    assert!(has("paa", "spelling", "på"), "{issues}");
+    assert!(has("tog station", "grammar", "togstation"), "{issues}");
+    assert!(has("bliver", "grammar", "blive"), "{issues}");
+    assert_eq!(arr.len(), 4, "{issues}");
+}
